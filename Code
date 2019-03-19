@@ -1,0 +1,270 @@
+//https://api.telegram.org/bot{API_TOKEN}/setWebHook?url={CURRENT_WEB_APP_URL} //строка вставляемая в адресную строку браузера для связки сервера телеги и нашего бота
+//вместо "{API_TOKEN}" и "{CURRENT_WEB_APP_URL}" нужно вставить токен и веб ссылку нашего опубликованного веб приложения
+
+//Глобальные переменные
+var API_TOKEN = '894860447:AAH1a2n7K2QIpa3ybfhfrjJ0ee3JpOya6Eo'; //апи токен бота получаем зарегистрировав название бота в BotFather
+var ss = SpreadsheetApp.openById("1rmj8ozqtzZRdngfH8PgJdZ1_-uDZHjOqFdbQGpz_4mc"); //гугл таблица, идентификатор - из ее адреса копируем
+
+var sheetLog = ss.getSheetByName('Лист1'); //листы таблицы
+var sheetLogError = ss.getSheetByName("Лист2");
+var sheetWork = ss.getSheetByName('Лист3');
+
+var cbText = 0;
+var fromId = 0;
+var cbId = 0;
+var botUpdate = 0;
+var messageId = 0;
+var fullName = 0;
+var name = 0; //Если чужой обратится к боту name останется = 0
+var formattedTime = Date.now()/86400000 + 25569 + 3/24;//dateTime.toISOString();
+var photoId = 0;
+
+
+function  doPost(e) {
+  var update = JSON.parse(e.postData.contents);  
+  if(update.hasOwnProperty('callback_query')) fromId = update.callback_query.from.id; 
+  if(update.hasOwnProperty('message')) fromId = update.message.chat.id;
+  
+  //Проверяем  ID пользователя 
+  switch (fromId){  
+    case 123456789: name = 'Иванов Иван Иваныч'; break; //впишите свой телеграм ID
+    // case '223456789': 'Петров Петр Петрович'; break;
+  }
+    
+  if(name == 0) { //если ID не совпали то пишем незнакомцу ответ и заносим его в лог
+    sendmes('Вы не зарегитрированы',{remove_keyboard: true},fromId);
+    log(fromId,' ',' ',' ',update);}
+  
+if(name != 0) { // !=  вписав свой телеграм ID надо изменить
+  var text1 = 'Начальное меню.';
+  var key1 = {inline_keyboard:[[{text:'Мануал',url:'https://tlgrm.ru/docs/bots/api'}],[{text:'Локация',callback_data:'1Локация'},{text:'Объект',callback_data:'2Объект'}],[{text:'Фото',callback_data:'3Фото'},{text:'Файл',callback_data:'4Файл'}],[{text:'Сообщение',callback_data:'5Сообщение'},{text:'Стереть меню',callback_data:'6Стереть'}],[{text:'Комментарий',callback_data:'7Комментарий'},{text:'⬅ Назад',callback_data:'8Назад'}]]};
+  var key2 = {remove_keyboard: true};
+  
+  
+  //========================================================================================================
+  
+  if(update.hasOwnProperty('callback_query')) {
+    botUpdate = update.callback_query; //весь колбэк
+    messageId = update.callback_query.message.message_id; //номер сообщения, ключевой признак
+    fullName = update.callback_query.from.first_name + '  ' + update.callback_query.from.last_name; //имя пользователя телеграмма
+    cbText = update.callback_query.data; //текст колбэка с кнопки
+    cbId = update.callback_query.id; //номер колбэка
+     
+  
+  //Обрабатываем нажатия кнопок меню    
+    switch (cbText){ 
+      case '1Локация': delmes(fromId,messageId); location('55.746613','37.577975,55',key1,fromId); break; //https://yandex.ru/maps/?pt=37.577975,55.746613&z=16
+      case '2Объект': delmes(fromId,messageId); venue('55.746613','37.577975,55','УИК №1','Москва, улица Арбат, дом 40, строение 2',key1,fromId); break;
+      case '3Фото': delmes(fromId,messageId); photo(sheetWork.getRange(2, 1).getValue(),'Описание',key1,fromId); break;
+      case '4Файл': delmes(fromId,messageId); document(sheetWork.getRange(2, 2).getValue(),'Описание',key1,fromId); break;
+      case '5Сообщение': sendmes('Трам пам пам - новое сообщение!',key2,fromId); break;
+      case '6Стереть': delmes(fromId,messageId); break;
+      case '7Комментарий': answercb('Это всплывающее окно',cbId);
+      case '8Назад': newmessage('Некуда назад, сами придумайте)',key1,fromId,messageId); break;
+    }
+  
+    if(cbText.slice(0,1) == '9'){
+      newmessage(text1,key1,fromId,messageId); //обновить сообщение бота
+      delmes(fromId,messageId); //удалить сообщение бота
+      sendmes(text1,key1,fromId); //послать новое сообщение
+      answercb(text1+'-'+text1,cbId); //ответить во всплывающем окне
+      photo(sheetWork.getRange(2, 1).getValue(),'Описание',key1,fromId); //послать фото
+      document(sheetWork.getRange(2, 2).getValue(),'Описание',key1,fromId); //послать файл
+      location('55.746613','37.577975,55',key1,fromId); // послать точку на карте
+      venue('55.746613','37.577975,55','УИК №1','Москва, улица Арбат, дом 40, строение 2',key1,fromId); // послать объект на карте с описанием
+    }
+        
+    
+  }
+  //===================================================================================================
+  
+
+  //Проверяем является ли апдейт сообщением
+  if (update.hasOwnProperty('message')) {
+    messageId = update.message.message_id; //номер текстового сообщения
+    var mesText = update.message.text; //собственно текст
+    botUpdate = update.message; //все сообщение
+    cbText = mesText; //записал для лога в тужу переменную
+    fullName = update.message.chat.first_name + '  ' + update.message.chat.last_name; //имя пользователя телеграмма
+
+    
+    switch(mesText){    
+      case '/start': sendmes(text1,key1,update.message.chat.id); break;      
+      // case 'qwerty': трам пам пам; break;
+    }
+    
+    if(update.message.hasOwnProperty('document')) { //проверяет является ли сообщение файлом и т д
+      sheetWork.getRange(2, 2).setValue(update.message.document.file_id);
+    }
+    
+    if(update.message.hasOwnProperty('photo')) { //проверяет является ли сообщение файлом и т д
+      sheetWork.getRange(2, 1).setValue(e.postData.contents.slice(e.postData.contents.lastIndexOf('file_id')+10,e.postData.contents.lastIndexOf('file_size')-3));
+    }
+    
+    if(mesText.slice(0,2) == 'Ab'){
+      
+    }        
+       
+    if(mesText.slice(0,1) != 'A' && mesText.slice(0,1)!='B' && mesText!='/start') sendmes('Я не  понимаю!',key2,fromId);
+        
+        
+  }
+ //=======================================================================================================================    
+ }
+}
+    
+
+
+function delmes(fromId,messageId){ //эта функция стирает сообщение бота по номеру, стереть сообщение пользователя вроде нельзя...
+messageId=messageId;
+  var data = {
+    method: "post",
+    payload: {
+      method: "deleteMessage",
+       chat_id: String(fromId),
+       message_id: messageId,
+    }
+  }
+   UrlFetchApp.fetch('https://api.telegram.org/bot' + API_TOKEN + '/', data);
+   //log(fromId,fullName,name,cbText,botUpdate); //запись в лог
+}
+
+
+function sendmes(text,key,chId){ //шлет новое сообщение
+  var data = {
+    method: "post",
+    payload: {
+      method: "sendMessage",
+      chat_id: String(chId),
+      text: text,
+      parse_mode: "HTML",
+      reply_markup: JSON.stringify(key)
+    }
+  }
+   UrlFetchApp.fetch('https://api.telegram.org/bot' + API_TOKEN + '/', data);
+   log(fromId,fullName,name,cbText,botUpdate); //запись в лог
+}
+
+
+function newmessage(text,key,fromId,messageId){ //редактирует существующее сообщение
+  var data = {
+    method: "post",
+    payload: {
+      method: "editMessageText",
+      chat_id: String(fromId),
+      message_id: messageId,
+      text: text,
+      parse_mode: "HTML",
+      reply_markup: JSON.stringify(key)
+    }
+  }
+ 
+  UrlFetchApp.fetch('https://api.telegram.org/bot' + API_TOKEN + '/', data);
+  log(fromId,fullName,name,cbText,botUpdate);
+}
+
+
+function answercb(text,cbId){ //всплывающее окно
+    var data = {
+      method: "post",
+      payload: {
+         method: "answerCallbackQuery",
+         callback_query_id: String(cbId),
+         show_alert: true,
+         text: text
+       }
+     }
+        
+        UrlFetchApp.fetch('https://api.telegram.org/bot' + API_TOKEN + '/', data);
+        log(fromId,fullName,name,cbText,botUpdate);
+}
+
+
+function photo(Id,capt,key,fromId){ //шлет фото
+  var data = {
+    method: "post",
+    payload: {
+      method: "sendPhoto",
+      chat_id: String(fromId),
+      caption: capt,
+      photo: Id, 
+      reply_markup: JSON.stringify(key)
+    }
+  }
+   UrlFetchApp.fetch('https://api.telegram.org/bot' + API_TOKEN + '/', data);
+   log(fromId,fullName,name,cbText,botUpdate);
+}
+
+
+function document(docId,capt,key,fromId){ //шлет файл
+  var data = {
+    method: "post",
+    payload: {
+      method: "sendDocument",
+      chat_id: String(fromId),
+      document: docId,
+      caption: capt,
+      reply_markup: JSON.stringify(key)
+    }
+  }
+   UrlFetchApp.fetch('https://api.telegram.org/bot' + API_TOKEN + '/', data);
+   log(fromId,fullName,name,cbText,botUpdate);
+}
+
+
+function location(lat,lon,key,fromId){ //шлет локацию
+  var data = {
+    method: "post",
+    payload: {
+      method: "sendLocation",
+      chat_id: String(fromId),
+      latitude: lat, 
+      longitude: lon, 
+      reply_markup: JSON.stringify(key)
+    }
+  }
+   UrlFetchApp.fetch('https://api.telegram.org/bot' + API_TOKEN + '/', data);
+   log(fromId,fullName,name,cbText,botUpdate);
+}
+
+
+function venue(lat,lon,title,addr,key,fromId){ //шлет объект - локация с описанием
+  var data = {
+    method: "post",
+    payload: {
+      method: "sendVenue",
+      chat_id: String(fromId),
+      latitude: lat, 
+      longitude: lon, 
+      foursquare_id: 'qwerty',
+      title: title,
+      address: addr, 
+      reply_markup: JSON.stringify(key)
+    }
+  }
+   UrlFetchApp.fetch('https://api.telegram.org/bot' + API_TOKEN + '/', data);
+   log(fromId,fullName,name,cbText,botUpdate);
+}
+
+
+function log(Id,fullName,name,text,msg){ //обязательно пишем лог
+  var rowLog = sheetLog.getRange(1, 1).getValue();
+  var rowLogError = sheetLogError.getRange(1, 1).getValue();  
+   
+  if(name==0){ //В лог неопознанных сообщений      
+    sheetLogError.getRange(1, 1).setValue(rowLogError+1); //растет номер строки
+    sheetLogError.getRange(rowLogError+1,2).setValue(formattedTime);
+    sheetLogError.getRange(rowLogError+1,3).setValue(Id);
+    sheetLogError.getRange(rowLogError+1,4).setValue(fullName);
+    sheetLogError.getRange(rowLogError+1,5).setValue(text);
+    sheetLogError.getRange(rowLogError+1,7).setValue(msg);
+    }
+    else { //В лог опознанных
+      sheetLog.getRange(1, 1).setValue(rowLog+1); //растет номер строки
+      sheetLog.getRange(rowLog+1,2).setValue(formattedTime);
+      sheetLog.getRange(rowLog+1,3).setValue(Id);
+      sheetLog.getRange(rowLog+1,4).setValue(name);
+      sheetLog.getRange(rowLog+1,5).setValue(text);
+      sheetLog.getRange(rowLog+1,6).setValue(msg);
+      }
+}
